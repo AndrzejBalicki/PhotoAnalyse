@@ -1,0 +1,7 @@
+opencv-python
+rawpy
+numpy
+pillow
+exifread
+tqdm
+pandas
