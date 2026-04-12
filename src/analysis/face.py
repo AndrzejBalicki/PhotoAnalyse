@@ -7,6 +7,10 @@ class FaceAnalyzer:
         )
 
     def compute(self, img):
+
+        if img is None:
+            return 0
+
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         faces = self.model.detectMultiScale(gray, 1.1, 4)
 

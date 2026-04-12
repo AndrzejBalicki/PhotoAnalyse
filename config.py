@@ -3,9 +3,9 @@ TIME_THRESHOLD = 0.4
 
 WEIGHTS = {
     "sharpness": 0.5,
-    "exposure": 0.2,
+    "exposure": 0.3,
     "noise": 0.1,
-    "face": 0.2
+    "face": 0.1
 }
 
 OUTPUT_DIR = "output"
