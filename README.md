@@ -182,38 +182,38 @@ Normalizacja wykonywana jest osobno dla każdej serii zdjęć.
 
 Program wykorzystuje następujące biblioteki Python:
 
-opencv-python
+- opencv-python
 
 przetwarzanie obrazu
 analiza ostrości
 detekcja twarzy
 
-rawpy
+- rawpy
 
 obsługa plików RAW (.ARW)
 
-numpy
+- numpy
 
 obliczenia matematyczne
 operacje na macierzach
 
-pillow / exifread
+- pillow / exifread
 
 odczyt danych EXIF
 
-tqdm
+- tqdm
 
 pasek postępu
 
-concurrent.futures
+- concurrent.futures
 
 przetwarzanie równoległe
 
-csv
+- csv
 
 zapis wyników
 
-os / shutil
+- os / shutil
 
 operacje na plikach
 
