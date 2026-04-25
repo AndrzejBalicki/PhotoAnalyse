@@ -4,10 +4,8 @@ from tqdm import tqdm
 import sys
 from pathlib import Path
 
-# Dodaj folder src do sys.path
 sys.path.append(str(Path(__file__).parent / "src"))
 
-# Importy modułów
 from src.loader.image_loader import ImageLoader
 from src.metadata.exif_reader import ExifReader
 from src.grouping.burst_grouper import BurstGrouper
@@ -23,6 +21,9 @@ from src.scoring.normalizer import normalize_scores
 from src.selection.selector import select_best
 from src.output.file_manager import handle_output
 from src.output.exporter import CSVExporter
+
+from src.utils.normalization import min_max_normalize
+from src.utils.exposure import exposure_quality
 
 import config
 
@@ -40,23 +41,12 @@ def process_image(file):
     noise = NoiseAnalyzer().compute(img)
     face = FaceAnalyzer().compute(img)
 
-    metrics = {
-        "sharpness": sharp,
-        "exposure": expo,
-        "noise": noise,
-        "face": face
-    }
-
-    score = Scorer().compute(metrics)
-
-    # ZWRACAMY dane zamiast zapisywać do listy globalnej
     return {
         "file": file,
         "sharpness": sharp,
         "exposure": expo,
         "noise": noise,
-        "face": face,
-        "score": score
+        "face": face
     }
 
 
@@ -77,14 +67,14 @@ def main(folder):
         print("Brak plików w folderze.")
         return
 
-    # EXIF
     exif = ExifReader()
     timestamps = [exif.get_timestamp(f) for f in files]
 
-    # Grupowanie
     groups = BurstGrouper().group(files, timestamps)
 
     all_results = []
+
+    scorer = Scorer()
 
     for group in groups:
 
@@ -99,18 +89,67 @@ def main(folder):
                 )
             )
 
-        # -----------------------------
-        # Normalizacja
-        # -----------------------------
-        scores = [r["score"] for r in results_data]
+        # ------------------------------------
+        # NORMALIZACJA METRYK (kluczowa zmiana)
+        # ------------------------------------
+
+        sharp_vals = [r["sharpness"] for r in results_data]
+        expo_vals = [r["exposure"] for r in results_data]
+        noise_vals = [r["noise"] for r in results_data]
+        face_vals = [r["face"] for r in results_data]
+
+        # odwrócenie logiki noise (mniej szumu = lepiej)
+
+        noise_vals = [
+            1 / (1 + v)
+            for v in noise_vals
+        ]
+
+        sharp_norm = min_max_normalize(sharp_vals)
+        expo_norm = [
+            exposure_quality(v)
+            for v in expo_vals
+        ]
+        noise_norm = min_max_normalize(noise_vals)
+        face_norm = min_max_normalize(face_vals)
+
+        # ------------------------------------
+        # LICZENIE SCORE Z NORMALIZOWANYCH DANYCH
+        # ------------------------------------
+
+        scores = []
+
+        for i in range(len(results_data)):
+
+            norm_metrics = {
+                "sharpness": sharp_norm[i],
+                "exposure": expo_norm[i],
+                "noise": noise_norm[i],
+                "face": face_norm[i]
+            }
+
+            score = scorer.compute(norm_metrics)
+
+            results_data[i]["sharpness_norm"] = sharp_norm[i]
+            results_data[i]["exposure_norm"] = expo_norm[i]
+            results_data[i]["noise_norm"] = noise_norm[i]
+            results_data[i]["face_norm"] = face_norm[i]
+            results_data[i]["score"] = score
+
+            scores.append(score)
+
+        # ------------------------------------
+        # NORMALIZACJA KOŃCOWA (ranking w serii)
+        # ------------------------------------
 
         norm_scores = normalize_scores(scores)
 
         best_idx = select_best(norm_scores)
 
-        # -----------------------------
-        # Zapis plików
-        # -----------------------------
+        # ------------------------------------
+        # ZAPIS PLIKÓW
+        # ------------------------------------
+
         for i, data in enumerate(results_data):
 
             handle_output(
@@ -119,16 +158,16 @@ def main(folder):
                 i == best_idx
             )
 
-        # dodajemy score po normalizacji
         for i in range(len(results_data)):
 
             results_data[i]["normalized_score"] = norm_scores[i]
 
         all_results.extend(results_data)
 
-    # -----------------------------
-    # Export CSV (raz na końcu)
-    # -----------------------------
+    # ------------------------------------
+    # EXPORT CSV
+    # ------------------------------------
+
     CSVExporter().export(all_results)
 
     print("\nZapisano wyniki do:")
